@@ -1,6 +1,7 @@
 ﻿using CSharp_Sample;
 using IMSSDKLib;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http.Headers;
@@ -10,15 +11,19 @@ using static IMSSKD_WebService.WebApiApplication;
 
 namespace IMSSKD_WebService
 {
-    public static class WebApiConfig
+    public abstract class WebApiConfig
     {
         public static IMSClientClass m_ImsClient = IMSSDK.GetInstance();
         public static int m_iErrorNone;
         public static EyeType m_WhichEye;
         public static int m_iUserID;
         public static string IresutlMatch = "";
+        public static List<string> arlist1 = new List<string>();
         public static string ErrorCodeRes = "";
         public static string m_strIPAddress;
+
+        private delegate void DelegateResponse(int iCID, int iRequestID, int iResponse);
+
         public static void Register(HttpConfiguration config)
         {
             // Web API configuration and services
@@ -34,6 +39,7 @@ namespace IMSSKD_WebService
 
             m_ImsClient.OnAddSingleEyeResponded += new _IIMSClientEvents_OnAddSingleEyeRespondedEventHandler(OnAddSingleEyeResponded);
             m_ImsClient.OnAddBothEyesResponded += new _IIMSClientEvents_OnAddBothEyesRespondedEventHandler(OnAddBothEyesResponded);
+            m_ImsClient.OnAddBothEyeForcedResponded += new _IIMSClientEvents_OnAddBothEyeForcedRespondedEventHandler(OnAddBEForcedResponded);
             m_ImsClient.OnVerifySingleEyeResponded += new _IIMSClientEvents_OnVerifySingleEyeRespondedEventHandler(OnVerifySingleEyeResponded);
             m_ImsClient.OnVerifyBothEyesResponded += new _IIMSClientEvents_OnVerifyBothEyesRespondedEventHandler(OnVerifyBothEyesResponded);
             m_ImsClient.OnRemoveUserResponded += new _IIMSClientEvents_OnRemoveUserRespondedEventHandler(OnRemoveUserResponded);
@@ -43,9 +49,9 @@ namespace IMSSKD_WebService
             m_ImsClient.OnError += new _IIMSClientEvents_OnErrorEventHandler(OnError);
             m_ImsClient.OnAlarm += new _IIMSClientEvents_OnAlarmEventHandler(OnAlarmRaised);
             m_ImsClient.OnBackPressure += new _IIMSClientEvents_OnBackPressureEventHandler(OnBackPressureEvent);
+            m_ImsClient.OnMatchSingleEyeResponded += new _IIMSClientEvents_OnMatchSingleEyeRespondedEventHandler(OnMatchSingleEyeResponded);
+            m_ImsClient.OnMatchBothEyesResponded += new _IIMSClientEvents_OnMatchBothEyesRespondedEventHandler(OnMatchBothEyesResponded);
         }
-
-
 
         private static void UnregisterEventHandlers()
         {
@@ -60,14 +66,107 @@ namespace IMSSKD_WebService
             m_ImsClient.OnVerifySingleEyeResponded -= new _IIMSClientEvents_OnVerifySingleEyeRespondedEventHandler(OnVerifySingleEyeResponded);
             m_ImsClient.OnVerifyBothEyesResponded -= new _IIMSClientEvents_OnVerifyBothEyesRespondedEventHandler(OnVerifyBothEyesResponded);
             m_ImsClient.OnBackPressure -= new _IIMSClientEvents_OnBackPressureEventHandler(OnBackPressureEvent);
+            m_ImsClient.OnMatchSingleEyeResponded -= new _IIMSClientEvents_OnMatchSingleEyeRespondedEventHandler(OnMatchSingleEyeResponded);
+            m_ImsClient.OnMatchBothEyesResponded -= new _IIMSClientEvents_OnMatchBothEyesRespondedEventHandler(OnMatchBothEyesResponded);
+            m_ImsClient.OnAddBothEyeForcedResponded -= new _IIMSClientEvents_OnAddBothEyeForcedRespondedEventHandler(OnAddBEForcedResponded);
         }
 
+
+
+        public static void OnMatchSingleEyeResponded(int iCID, int iRequestID, int MatchFound, object UserID, object HammingDistance, object MatchedEye, object ImageQuality, int iResponse)
+        {
+            try
+            {
+                if (iResponse != m_iErrorNone)
+                {
+                    IresutlMatch = ShowErrorMessage(iResponse, Constants.IDENTIFY);
+                    ErrorCodeRes = iResponse.ToString();
+                }
+                else
+                {
+                    if (MatchFound != 0)
+                    {
+                        IresutlMatch = MatchFoundStringBuilder(MatchFound, UserID, HammingDistance, null, Constants.IDENTIFY);
+                        ErrorCodeRes = "100"; //code when found Matching
+                    }
+                    else
+                    {
+                        IresutlMatch = "Dose Not Found Matching";
+                        ErrorCodeRes = "400"; //code when found Matching
+                    }
+
+                }
+            }
+            catch (Exception e)
+            {
+                IresutlMatch = e.Message;
+            }
+        }
+
+        private static void OnMatchBothEyesResponded(int iCID, int iRequestID, int MatchFound, object UserID, object HammingDistance_RE, object HammingDistance_LE, object MatchedEye_RE, object MatchedEye_LE, object ImageQuality_RE, object ImageQuality_LE, int iResponse)
+        {
+
+            ErrorCodeRes = "";
+            IresutlMatch = "";
+
+            try
+            {
+                if (iResponse != m_iErrorNone)
+                {
+                    IresutlMatch = ShowErrorMessage(iResponse, Constants.IDENTIFY);
+                    ErrorCodeRes = iResponse.ToString();
+                }
+                else
+                {
+                    if (MatchFound != 0)
+                    {
+                        IresutlMatch = MatchFoundBothStringBuilder(MatchFound, UserID, HammingDistance_RE, HammingDistance_LE, MatchedEye_RE, MatchedEye_LE, null, Constants.IDENTIFY);
+                        ErrorCodeRes = "100"; //code when found Matching
+                    }
+                    else
+                    {
+                        IresutlMatch = "Dose Not Found Matching";
+                        ErrorCodeRes = "400"; //code when found Matching
+                    }
+
+
+                }
+
+            }
+            catch (Exception e)
+            {
+                IresutlMatch = e.Message;
+            }
+        }
 
         public static void OnAlarmRaised(int iSessionID, int iBladeID, string strDateTime, int iErrorCode, string strDescription)
         {
             try
             {
                 IresutlMatch = strDescription;
+            }
+            catch (Exception e)
+            {
+                IresutlMatch = e.Message + " " + Constants.STRING_APPNAME;
+            }
+        }
+
+        public static void OnAddBEForcedResponded(int iCID, int iRequestID, int iResponse)
+        {
+            try
+            {
+                if (iResponse != m_iErrorNone)
+                {
+                    IresutlMatch = ShowErrorMessage(iResponse, Constants.ADD_FORCE);
+                    ErrorCodeRes = iResponse.ToString();
+                }
+                else
+                {
+                    IresutlMatch = string.Format("Both Eyes for User : {0} added.{1}", m_iUserID.ToString(), "\t");
+                    ErrorCodeRes = "";
+
+                }
+
             }
             catch (Exception e)
             {
@@ -126,8 +225,10 @@ namespace IMSSKD_WebService
                 else
                 {
                     IresutlMatch = string.Format("{0}{1} for User : {2} ,  removed {3}", Convert.ToString(m_WhichEye), (((int)m_WhichEye) > 2 ? " Eyes" : " Eye"), Convert.ToString(m_iUserID), "\t") + Constants.REMOVE_USER;
+                    ErrorCodeRes = "100";
                 }
 
+                Thread.Sleep(1000); 
             }
             catch (Exception e)
             {
@@ -172,6 +273,8 @@ namespace IMSSKD_WebService
                 else
                 {
                     IresutlMatch = string.Format("UserID is : {0} , MatchFound : {1} , HammingDistance : {2}  , Response is : {3} ", m_iUserID.ToString(), iMatchFound, dHammingDistance, iResponse) + Constants.VERIFY_EYE;
+
+                    ErrorCodeRes = "100"; //code when found Matching
                 }
 
             }
@@ -197,7 +300,7 @@ namespace IMSSKD_WebService
                 }
                 else
                 {
-                    IresutlMatch = string.Format("{0} Eye for User ID : {1} enrolled.{2}", Convert.ToString(m_WhichEye), Convert.ToString(m_iUserID), Constants.ENROLL); ;  
+                    IresutlMatch = string.Format("{0} Eye for User ID : {1} enrolled.{2}", Convert.ToString(m_WhichEye), Convert.ToString(m_iUserID), Constants.ENROLL); ;
                     ErrorCodeRes = ""; //code when found Enroll   
 
                 }
@@ -221,6 +324,7 @@ namespace IMSSKD_WebService
                 else if (MatchFound > 0)
                 {
                     IresutlMatch = MatchFoundBothStringBuilder(MatchFound, UserID, HammingDistance_RE, HammingDistance_LE, MatchedEye_RE, MatchedEye_LE, null, Constants.ENROLL);
+
                 }
                 else
                 {
@@ -233,7 +337,7 @@ namespace IMSSKD_WebService
             {
                 IresutlMatch = e.Message;
             }
-             
+
         }
 
         private static string MatchFoundBothStringBuilder(int MatchFound, object UserID, object HammingDistance_RE, object HammingDistance_LE, object MatchedEye_RE, object MatchedEye_LE, object RankedIndex, string strOwner)
@@ -255,15 +359,32 @@ namespace IMSSKD_WebService
                     int iCount = 0;
                     foreach (int i in (int[])UserID)
                     {
-                        strMatch += String.Format(" {0}/{1}/{2}, ", i.ToString(), ((double[])HammingDistance_RE)[iCount], ((double[])HammingDistance_LE)[iCount]);
+                        strMatch += i.ToString() + ",";
+                        //String.Format(" {0}/{1}/{2}, ", i.ToString(), ((double[])HammingDistance_RE)[iCount], ((double[])HammingDistance_LE)[iCount]);
                         //strMatch += "\n";
                         iCount++;
                     }
+
+
+                    strMatch = strMatch.Remove(strMatch.Length - 1, 1);
+
+
+
+                    var EndReusltProfileNo = strMatch.Split(',');
+
+                    for (var x = 0; x < EndReusltProfileNo.Length; x++)
+                    {
+                        arlist1.Add(EndReusltProfileNo[x]);
+                    }
+
+
                 }
 
                 if (strMatch != string.Empty)
                 {
-                    strMatch = string.Format("{0} match found.{1}User {2}{3}{4}", Convert.ToString(MatchFound), "\n", (MatchFound > 1 ? "ID's are (UID/RHd/LHd) : " : "ID is (UID:RHd/LHd) : "), strMatch.Remove(strMatch.Length - 2, 2), "\t");
+                    //strMatch = string.Format("{0} match found.{1}User {2}{3}{4}", Convert.ToString(MatchFound), "\n", (MatchFound > 1 ? "ID's are (UID/RHd/LHd) : " : "ID is (UID:RHd/LHd) : "), strMatch.Remove(strMatch.Length - 2, 2), "\t");
+
+                    strMatch = string.Format("{0} match found {1} User {2} {3}", Convert.ToString(MatchFound), "For " + WebApiConfig.m_WhichEye + " Eye", (MatchFound > 1 ? "ID's are : " : "ID is : "), strMatch);
                 }
                 else
                 {
@@ -273,7 +394,7 @@ namespace IMSSKD_WebService
             }
             catch (Exception e)
             {
-                var strErrorMessage = e.Message;
+                strMatch = e.Message;
             }
 
             return strMatch;
@@ -298,15 +419,17 @@ namespace IMSSKD_WebService
                     int iCount = 0;
                     foreach (int i in (int[])UserID)
                     {
-                        strMatch += i.ToString();
-                       // strMatch += ((double[])HammingDistance)[iCount].ToString() + ", ";
+                        strMatch += i.ToString() + ",";
+                        // strMatch += ((double[])HammingDistance)[iCount].ToString() + ", ";
                         iCount++;
                     }
+
+                    strMatch = strMatch.Remove(strMatch.Length - 1, 1);
                 }
 
                 if (strMatch != string.Empty)
                 {
-                    strMatch = string.Format("{0} match found {1} User {2} {3}", Convert.ToString(MatchFound), "For " + WebApiConfig.m_WhichEye + " Eye" , (MatchFound > 1 ? "ID's are : " : "ID is : "), strMatch);
+                    strMatch = string.Format("{0} match found {1} User {2} {3}", Convert.ToString(MatchFound), "For " + WebApiConfig.m_WhichEye + " Eye", (MatchFound > 1 ? "ID's are : " : "ID is : "), strMatch);
                 }
                 else
                 {
@@ -374,6 +497,7 @@ namespace IMSSKD_WebService
                 IresutlMatch = e.Message + " " + Constants.STRING_APPNAME;
             }
         }
+
 
 
         private static string ShowErrorMessage(int iResponse, string strOwner)
